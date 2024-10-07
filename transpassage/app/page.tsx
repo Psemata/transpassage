@@ -1,6 +1,7 @@
 "use client";
 
 import useFetch from "@/hooks/useFetch";
+import Wigle from "@/types/Wigle";
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 
@@ -9,12 +10,18 @@ const Sketch = dynamic(() => import("@/components/transpassageSketch"), {
 });
 
 const Transpassage: React.FC = () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [csvData, setCsvData] = useState<any[]>([]);
+  const [csvData, setCsvData] = useState<Wigle[]>([]);
   const { fetchCsvData } = useFetch();
 
   useEffect(() => {
     fetchCsvData("/csv/wigle.csv", setCsvData);
+    setCsvData(
+      csvData.filter(
+        (obj, index, self) =>
+          index === self.findIndex((o) => o.ssid === obj.ssid)
+      )
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

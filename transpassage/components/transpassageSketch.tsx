@@ -2,15 +2,16 @@
 "use client";
 
 import { parseDateString } from "@/lib/utils";
+import Wigle from "@/types/Wigle";
 import p5 from "p5";
-import React, { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
+import WigleElement from "./p5Classes/WigleElement";
 // import Set from "./p5Classes/Set";
 // import InOut from "./p5Classes/InOut";
 // import Person from "./p5Classes/Person";
 
 interface TranspassageSketchProp {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  csvData: any[];
+  csvData: Wigle[];
 }
 
 const TranspassageSketch = ({ csvData }: TranspassageSketchProp) => {
@@ -100,7 +101,8 @@ const TranspassageSketch = ({ csvData }: TranspassageSketchProp) => {
     return (
       parseDateString(v.firstseen).getDate() == 3 &&
       parseDateString(v.firstseen).getHours() >= 14 &&
-      parseDateString(v.firstseen).getHours() < 15
+      parseDateString(v.firstseen).getHours() < 15 &&
+      v.ssid != null
     );
   };
 
@@ -108,13 +110,27 @@ const TranspassageSketch = ({ csvData }: TranspassageSketchProp) => {
     if (!canvasRef.current) return;
 
     const sketch: p5 = new p5((p: p5) => {
-      const data = csvData.filter(wigleFilter);
+      let data: Wigle[] = [];
+      const wigleStream: WigleElement[] = [];
 
       const stationTime = new Date(2024, 3, 10, 14, 0, 0);
 
       // Setup
       p.setup = () => {
         p.createCanvas(p.windowWidth, p.windowHeight);
+        data = csvData.filter(wigleFilter);
+
+        for (const dataElement of data) {
+          wigleStream.push(
+            new WigleElement(
+              p,
+              p.createVector(0),
+              p.createVector(0),
+              p.createVector(0),
+              dataElement
+            )
+          );
+        }
       };
 
       // Draw function
@@ -134,17 +150,12 @@ const TranspassageSketch = ({ csvData }: TranspassageSketchProp) => {
         );
 
         p.textSize(45);
-        for (const caughtData of data) {
+        for (const caughtData of wigleStream) {
           if (
-            parseDateString(caughtData.firstseen).getMinutes() ==
+            parseDateString(caughtData.wigle.firstseen!).getMinutes() ==
             stationTime.getMinutes()
           ) {
-            const x = p.random(p.width);
-            const y = p.random(p.height);
-            p.ellipse(x, y, 10, 10);
-            if (caughtData.ssid) {
-              p.text(caughtData.ssid, x, y + 5);
-            }
+            caughtData.show();
           }
         }
       };
