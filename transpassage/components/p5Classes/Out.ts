@@ -1,7 +1,7 @@
 import p5 from "p5";
 import P5Element from "./P5Element";
 
-export default class Set extends P5Element {
+export default class Out extends P5Element {
   width: number;
   height: number;
 
@@ -11,19 +11,18 @@ export default class Set extends P5Element {
     this.height = height;
   }
 
-  update() {}
-
-  show() {
-    this.p.fill(0);
-    this.p.rect(this.position.x, this.position.y, this.width, this.height);
+  randomPoint() {
+    return this.p.createVector(
+      this.position.x + Math.random() * this.width,
+      this.position.y + Math.random() * this.height
+    );
   }
 
-  contains(point: p5.Vector) {
-    return (
-      point.x > this.position.x &&
-      point.x < this.position.x + this.width &&
-      point.y > this.position.y &&
-      point.y < this.position.y + this.height
-    );
+  /**
+   * Used for debug
+   */
+  show() {
+    this.p.fill(255, 0, 0);
+    this.p.rect(this.position.x, this.position.y, this.width, this.height);
   }
 }

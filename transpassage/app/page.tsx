@@ -15,12 +15,6 @@ const Transpassage: React.FC = () => {
 
   useEffect(() => {
     fetchCsvData("/csv/wigle.csv", setCsvData);
-    setCsvData(
-      csvData.filter(
-        (obj, index, self) =>
-          index === self.findIndex((o) => o.ssid === obj.ssid)
-      )
-    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
