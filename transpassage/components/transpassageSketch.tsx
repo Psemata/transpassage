@@ -1,9 +1,9 @@
 "use client";
 
-import { parseDateString } from "@/lib/utils";
+import { cn, parseDateString } from "@/lib/utils";
 import Wigle from "@/types/Wigle";
 import p5 from "p5";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Gsm from "./p5Classes/Gsm";
 import Out from "./p5Classes/Out";
 import WigleElement from "./p5Classes/WigleElement";
@@ -14,14 +14,44 @@ interface TranspassageSketchProp {
 
 const TranspassageSketch = ({ csvData }: TranspassageSketchProp) => {
   const canvasRef = useRef<HTMLDivElement>(null);
+  const listRefLeft = useRef<HTMLUListElement>(null);
+  const lastItemRef = useRef<HTMLDivElement>(null);
+
+  const connectionCount = useRef<number>(0);
+
+  const [dataList, setDataList] = useState<Wigle[]>([]);
+  const [stationTime, setStationTime] = useState(
+    new Date(2024, 10, 9, 14, 0, 0)
+  );
+  const [newItemIndex, setNewItemIndex] = useState<number | null>(null);
+
+  const addItem = (newItem: Wigle) => {
+    setDataList((prevList) => {
+      const updatedList = [...prevList, newItem];
+      setNewItemIndex(updatedList.length - 1);
+      return updatedList;
+    });
+
+    // Reset the newItemIndex after the animation
+    setTimeout(() => {
+      setNewItemIndex(null);
+    }, 500); // Match this with the CSS transition duration
+  };
 
   const wigleFilter = (v: Wigle) => {
     return (
-      parseDateString(v.firstseen).getDate() == 3 &&
+      parseDateString(v.firstseen).getDate() == 9 &&
       parseDateString(v.firstseen).getHours() >= 14 &&
       parseDateString(v.firstseen).getHours() < 15
     );
   };
+
+  useEffect(() => {
+    if (lastItemRef.current) {
+      lastItemRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+    connectionCount.current = dataList.length;
+  }, [dataList]);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -30,14 +60,27 @@ const TranspassageSketch = ({ csvData }: TranspassageSketchProp) => {
       const outs: Out[] = [];
 
       let data: Wigle[] = [];
-      let addedData: Set<Wigle> = new Set<Wigle>();
+      const addedData: Set<Wigle> = new Set<Wigle>();
 
       const wigleStream: WigleElement[] = [];
 
-      let gsm: Wigle;
       let gsmElement: Gsm;
 
-      const stationTime = new Date(2024, 9, 3, 14, 0, 0);
+      let monoFont: p5.Font;
+
+      // Info bar
+      const altitude: string = "ALT 468.2399696998695";
+      const latitude: string = "LAT 46.210846601205034";
+      const longitude: string = "LONG 6.142975067290402";
+      let date: string = "";
+      let time: string = "";
+      let average: string = "";
+      let wigleCount = 0;
+      let wigleCountMin = 0;
+
+      p.preload = () => {
+        monoFont = p.loadFont("/fonts/FragmentMono-Regular.ttf");
+      };
 
       // Setup
       p.setup = () => {
@@ -47,41 +90,35 @@ const TranspassageSketch = ({ csvData }: TranspassageSketchProp) => {
         outs.push(
           new Out(
             p,
-            p.createVector(-p.width / 2, -p.height / 2 - 20),
-            p.width,
+            p.createVector(-p.width / 2 + 200, -p.height / 2 - 20),
+            p.width - 400,
             10
           ),
           new Out(
             p,
-            p.createVector(p.width / 2 + 20, -p.height / 2),
+            p.createVector(p.width / 2 + 20, -p.height / 2 + 200),
             10,
-            p.height
+            p.height - 400
           ),
           new Out(
             p,
-            p.createVector(-p.width / 2, p.height / 2 + 20),
-            p.width,
+            p.createVector(-p.width / 2 + 200, p.height / 2 + 20),
+            p.width - 400,
             10
           ),
           new Out(
             p,
-            p.createVector(-p.width / 2 - 20, -p.height / 2),
+            p.createVector(-p.width / 2 - 20, -p.height / 2 + 200),
             10,
-            p.height
+            p.height - 400
           )
         );
 
         // Preparing data
         data = csvData.filter(wigleFilter);
 
-        gsm = data
-          .filter((v) => v.type == "GSM")
-          .sort((v1, v2) => v1.accuracymeters - v2.accuracymeters)[0];
-
-        gsmElement = new Gsm(p, p.createVector(0, 0), gsm);
-
         // Creating the base elements
-        for (let i = 0; i < 1000; i++) {
+        for (let i = 0; i < 400; i++) {
           wigleStream.push(
             new WigleElement(
               p,
@@ -92,21 +129,44 @@ const TranspassageSketch = ({ csvData }: TranspassageSketchProp) => {
             )
           );
         }
+
+        gsmElement = new Gsm(p, p.createVector(0, 0), wigleStream);
       };
 
       // Draw
       p.draw = () => {
-        p.background(0);
+        p.background(25);
+
+        p.textFont(monoFont);
+
+        if (stationTime.getSeconds() != p.second()) {
+          addedData.clear();
+        }
 
         if (stationTime.getMinutes() != p.minute()) {
-          addedData.clear();
+          wigleCountMin = wigleCount;
+          wigleCount = 0;
         }
 
         stationTime.setMinutes(p.minute());
         stationTime.setSeconds(p.second());
 
-        // Draw center of the experience, the gsm towers
-        gsmElement.show();
+        time =
+          stationTime.getHours() +
+          2 +
+          ":" +
+          stationTime.getMinutes().toString().padStart(2, "0") +
+          ":" +
+          stationTime.getSeconds().toString().padStart(2, "0");
+
+        date =
+          stationTime.getFullYear() +
+          "-" +
+          stationTime.getMonth().toString().padStart(2, "0") +
+          "-" +
+          stationTime.getDate().toString().padStart(2, "0");
+
+        setStationTime(stationTime);
 
         for (const caughtData of data) {
           if (
@@ -116,12 +176,20 @@ const TranspassageSketch = ({ csvData }: TranspassageSketchProp) => {
               stationTime.getSeconds()
           ) {
             if (!addedData.has(caughtData)) {
-              const elem = p.random(wigleStream);
+              const elem = p.random(wigleStream.filter((v) => v.wigle == null));
               elem.setWigle(caughtData);
+
+              if (!addedData.has(caughtData)) {
+                addItem(caughtData);
+                wigleCount++;
+              }
+
               addedData.add(caughtData);
             }
           }
         }
+
+        average = "connections per minute : " + wigleCountMin;
 
         for (const element of wigleStream) {
           element.update();
@@ -132,72 +200,121 @@ const TranspassageSketch = ({ csvData }: TranspassageSketchProp) => {
           }
         }
 
-        // for (const caughtData of wigleStream) {
-        //   if (
-        //     parseDateString(caughtData.wigle.firstseen!).getMinutes() ==
-        //       stationTime.getMinutes() &&
-        //     parseDateString(caughtData.wigle.firstseen!).getSeconds() ==
-        //       stationTime.getSeconds()
-        //   ) {
-        //     addedWigle.push(caughtData);
+        // Draw center of the experience, the gsm towers
+        gsmElement.show();
+        gsmElement.update();
 
-        //     p.textAlign(p.LEFT);
-
-        //     // Right list
-        //     if (caughtData.wigle.ssid) {
-        //       p.text(caughtData.wigle.ssid, p.width - 200, textIndex);
-        //     } else {
-        //       p.text("x", p.width - 200, textIndex);
-        //     }
-
-        //     // Left list
-        //     // p.text(caughtData.wigle.mac, 10, textIndex);
-
-        //     // Circle text test
-        //     p.textAlign(p.CENTER);
-
-        //     p.push();
-        //     p.translate(100, textIndex * 4);
-        //     p.noStroke();
-        //     p.ellipse(0, 0, 50, 50);
-
-        //     // We must keep track of our position along the curve
-        //     let arclength = 0;
-
-        //     // For every box
-        //     for (let i = 0; i < caughtData.wigle.mac.length; i++) {
-        //       // The character and its width
-        //       const currentChar = caughtData.wigle.mac.charAt(i);
-        //       // Instead of a constant width, we check the width of each character.
-        //       const w = p.textWidth(currentChar);
-        //       // Each box is centered so we move half the width
-        //       arclength += w / 2;
-
-        //       // Angle in radians is the arclength divided by the radius
-        //       // Starting on the left side of the circle by adding PI
-        //       const theta = p.PI + arclength / 25;
-
-        //       p.push();
-
-        //       // Polar to Cartesian conversion allows us to find the point along the curve. See Chapter 13 for a review of this concept.
-        //       p.translate(25 * p.cos(theta), 25 * p.sin(theta));
-        //       // Rotate the box (rotation is offset by 90 degrees)
-        //       p.rotate(theta + p.PI / 2);
-
-        //       // Display the character
-        //       p.fill(0);
-        //       p.text(currentChar, 0, 0);
-
-        //       p.pop();
-
-        //       // Move halfway again
-        //       arclength += w / 2;
-        //     }
-        //     p.pop();
-
-        //     textIndex += 20;
-        //   }
-        // }
+        // Info bar
+        p.fill(255);
+        p.textSize(15);
+        p.text(altitude, p.width - p.textWidth(altitude) - 10, p.height - 10);
+        p.text("//", p.width - p.textWidth(altitude) - 40, p.height - 10);
+        p.text(
+          latitude,
+          p.width - p.textWidth(latitude) - p.textWidth(altitude) - 50,
+          p.height - 10
+        );
+        p.text(
+          "//",
+          p.width - p.textWidth(latitude) - p.textWidth(altitude) - 80,
+          p.height - 10
+        );
+        p.text(
+          longitude,
+          p.width -
+            p.textWidth(latitude) -
+            p.textWidth(altitude) -
+            p.textWidth(longitude) -
+            90,
+          p.height - 10
+        );
+        p.text(
+          "//",
+          p.width -
+            p.textWidth(latitude) -
+            p.textWidth(altitude) -
+            p.textWidth(longitude) -
+            120,
+          p.height - 10
+        );
+        p.text(
+          date,
+          p.width -
+            p.textWidth(latitude) -
+            p.textWidth(altitude) -
+            p.textWidth(longitude) -
+            p.textWidth(date) -
+            130,
+          p.height - 10
+        );
+        p.text(
+          "//",
+          p.width -
+            p.textWidth(latitude) -
+            p.textWidth(altitude) -
+            p.textWidth(longitude) -
+            p.textWidth(date) -
+            160,
+          p.height - 10
+        );
+        p.text(
+          time,
+          p.width -
+            p.textWidth(latitude) -
+            p.textWidth(altitude) -
+            p.textWidth(longitude) -
+            p.textWidth(date) -
+            p.textWidth(time) -
+            170,
+          p.height - 10
+        );
+        p.text(
+          "//",
+          p.width -
+            p.textWidth(latitude) -
+            p.textWidth(altitude) -
+            p.textWidth(longitude) -
+            p.textWidth(date) -
+            p.textWidth(time) -
+            200,
+          p.height - 10
+        );
+        p.text(
+          average,
+          p.width -
+            p.textWidth(latitude) -
+            p.textWidth(altitude) -
+            p.textWidth(longitude) -
+            p.textWidth(date) -
+            p.textWidth(time) -
+            p.textWidth(average) -
+            210,
+          p.height - 10
+        );
+        p.text(
+          "//",
+          p.width -
+            p.textWidth(latitude) -
+            p.textWidth(altitude) -
+            p.textWidth(longitude) -
+            p.textWidth(date) -
+            p.textWidth(time) -
+            p.textWidth(average) -
+            240,
+          p.height - 10
+        );
+        p.text(
+          "total of connections : " + connectionCount.current,
+          p.width -
+            p.textWidth(latitude) -
+            p.textWidth(altitude) -
+            p.textWidth(longitude) -
+            p.textWidth(date) -
+            p.textWidth(time) -
+            p.textWidth(average) -
+            500,
+          p.height - 10
+        );
       };
 
       p.windowResized = () => {
@@ -214,10 +331,82 @@ const TranspassageSketch = ({ csvData }: TranspassageSketchProp) => {
   }, [csvData]);
 
   return (
-    <div
-      ref={canvasRef}
-      className="fixed inset-0 w-screen h-screen overflow-hidden bg-transparent"
-    />
+    <div className="relative w-full h-screen font-custom">
+      <div
+        ref={canvasRef}
+        className="absolute inset-0 w-full h-full overflow-hidden bg-transparent"
+      />
+      <div className="absolute top-0 left-0 z-10 p-4 bg-black bg-opacity-70 text-white h-full w-56 max-h-full overflow-y-auto whitespace-pre-wrap">
+        {/* <h1 className="w-full text-center text-2xl font-custom mb-4">
+          {dataList.length} <br />
+          Connections
+        </h1> */}
+        <ul
+          ref={listRefLeft}
+          className="flex flex-col pl-2 my-2 max-h-full overflow-y-auto"
+        >
+          {dataList.map((item, index) => {
+            let listElem = "";
+
+            if (item.frequency) {
+              listElem += "Frequency " + item.frequency + "\n";
+            }
+
+            if (item.channel) {
+              listElem += "Channel " + item.channel + "\n";
+            }
+
+            listElem += item.type + "\n";
+            listElem += item.authmode + "\n";
+
+            return (
+              <div
+                key={index + item.mac + "group"}
+                className={cn(
+                  "transition-all duration-500 ease-in-out",
+                  index === newItemIndex
+                    ? "opacity-0 translate-y-4"
+                    : "opacity-100 translate-y-0"
+                )}
+                ref={index === dataList.length - 1 ? lastItemRef : null}
+              >
+                <li
+                  key={index + item.mac}
+                  className={cn(
+                    "border-dotted border-t-2 pt-2 text-opacity-50 opacity-50",
+                    item.type === "WIFI"
+                      ? "text-red-700"
+                      : item.type === "BLE"
+                      ? "text-green-500"
+                      : "text-blue-600",
+                    parseDateString(item.firstseen).getMinutes() ==
+                      stationTime.getMinutes() &&
+                      parseDateString(item.firstseen).getSeconds() ==
+                        stationTime.getSeconds() &&
+                      "text-opacity-100 opacity-100"
+                  )}
+                >
+                  {item.mac}
+                </li>
+                <li
+                  key={"content" + index + item.mac}
+                  className={cn(
+                    "mb-2 text-opacity-30 opacity-30",
+                    parseDateString(item.firstseen).getMinutes() ==
+                      stationTime.getMinutes() &&
+                      parseDateString(item.firstseen).getSeconds() ==
+                        stationTime.getSeconds() &&
+                      "text-opacity-70 opacity-70"
+                  )}
+                >
+                  {listElem}
+                </li>
+              </div>
+            );
+          })}
+        </ul>
+      </div>
+    </div>
   );
 };
 

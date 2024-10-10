@@ -14,7 +14,7 @@ const Transpassage: React.FC = () => {
   const { fetchCsvData } = useFetch();
 
   useEffect(() => {
-    fetchCsvData("/csv/wigle.csv", setCsvData);
+    fetchCsvData("/csv/wigle-2.csv", setCsvData);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
